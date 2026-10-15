@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GDrive Media Downloader</title>
+  <link rel="manifest" href="site.v1.webmanifest" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <main class="main">
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+          <!-- Google Drive -->
+          <path
+            fill="#0F9D58"
+            d="M218.1 131.4L64 402.5L144.6 544L301 272.8L218.1 131.4Z"
+          />
+
+          <path
+            fill="#F4B400"
+            d="M403 378.9L239.4 96L400.6 96L564.2 378.9L403 378.9Z"
+          />
+
+          <path
+            fill="#4285F4"
+            d="M265.5 402.5L184.9 544L495.4 544L576 402.5L265.5 402.5Z"
+          />
+        </svg>
+        <span class="title">GDrive Media Downloader</span>
+      </h1>
+      <p>(Only ZIP and Media files are supported)</p>
+      <div class="inputContainer">
+        <label for="urlInput">Google Drive URL:</label>
+        <input type="text" id="urlInput" placeholder="Enter Google Drive URL" />
+        <label for="nameInput">File Name:</label>
+        <input
+          type="text"
+          id="nameInput"
+          placeholder="Enter a movie or TV series name"
+        />
+        <div class="card">
+          <div class="radio-group">
+            <input
+              type="radio"
+              id="tv-series"
+              name="category"
+              value="tv"
+              checked
+            />
+            <label class="option-label" for="tv-series"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path
+                  d="M2 4.00087C2 3.44811 2.45531 3 2.9918 3H21.0082C21.556 3 22 3.44463 22 4.00087V17.9991C22 18.5519 21.5447 19 21.0082 19H2.9918C2.44405 19 2 18.5554 2 17.9991V4.00087ZM5 20H19V22H5V20Z"
+                ></path></svg
+              >TV Series</label
+            >
+
+            <input type="radio" id="movies" name="category" value="movie" />
+            <label class="option-label" for="movies"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path
+                  d="M2 3.9934C2 3.44476 2.45531 3 2.9918 3H21.0082C21.556 3 22 3.44495 22 3.9934V20.0066C22 20.5552 21.5447 21 21.0082 21H2.9918C2.44405 21 2 20.5551 2 20.0066V3.9934ZM10.6219 8.41459C10.5562 8.37078 10.479 8.34741 10.4 8.34741C10.1791 8.34741 10 8.52649 10 8.74741V15.2526C10 15.3316 10.0234 15.4088 10.0672 15.4745C10.1897 15.6583 10.4381 15.708 10.6219 15.5854L15.5008 12.3328C15.5447 12.3035 15.5824 12.2658 15.6117 12.2219C15.7343 12.0381 15.6846 11.7897 15.5008 11.6672L10.6219 8.41459Z"
+                ></path></svg
+              >Movies</label
+            >
+            <input type="radio" id="anime" name="category" value="anime" />
+            <label class="option-label hidden" for="anime"
+              >
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 100 100"
+     width="40" height="40"
+     role="img" aria-label="Anime">
+  <rect x="9" y="17" width="82" height="66"
+        rx="15" fill="#ef4444"/>
+  <path d="M25 38 L36 19 L48 31 L59 12
+           L72 31 L83 26 L77 47 L72 66
+           L59 80 L41 80 L28 65 Z"
+        fill="#171717"/>
+  <path d="M34 46 L46 42 L42 50 Z
+           M55 42 L68 46 L60 50 Z"
+        fill="#fff"/>
+  <path d="M43 61 Q51 66 61 59"
+        stroke="#fff" stroke-width="2.5"
+        fill="none" stroke-linecap="round"/>
+  <path d="M42 29 L51 39 L63 25"
+        stroke="#ef4444" stroke-width="3"
+        fill="none"/>
+  <path d="M42 80 L37 91 L50 85
+           L63 91 L59 80 Z"
+        fill="#171717"/>
+</svg>
+Anime</label
+            >
+            <span class="more-options">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-down-fill" viewBox="0 0 16 16">
+  <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-left-fill hidden" viewBox="0 0 16 16">
+  <path d="m3.86 8.753 5.482 4.796c.646.566 1.658.106 1.658-.753V3.204a1 1 0 0 0-1.659-.753l-5.48 4.796a1 1 0 0 0 0 1.506z"/>
+</svg>
+</span>
+            <button class="hidden reset">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="currentColor"
+                class="bi bi-arrow-clockwise"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"
+                />
+                <path
+                  d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusContainer">
+        <div class="loader hidden"></div>
+        <button id="downloadButton" type="button">
+          <span class="buttonContainer">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path
+                d="M4 19H20V12H22V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V12H4V19ZM14 9H19L12 16L5 9H10V3H14V9Z"
+              ></path>
+            </svg>
+            Download
+          </span>
+        </button>
+      </div>
+      <div id="status" role="status" aria-live="polite"></div>
+    </main>
+    <div class="options">
+      <div class="options-menu">
+      <span class="deleteone">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          fill="currentColor"
+          class="bi bi-trash2"
+          viewBox="0 0 16 16"
+        >
+          <path
+            d="M14 3a.7.7 0 0 1-.037.225l-1.684 10.104A2 2 0 0 1 10.305 15H5.694a2 2 0 0 1-1.973-1.671L2.037 3.225A.7.7 0 0 1 2 3c0-1.105 2.686-2 6-2s6 .895 6 2M3.215 4.207l1.493 8.957a1 1 0 0 0 .986.836h4.612a1 1 0 0 0 .986-.836l1.493-8.957C11.69 4.689 9.954 5 8 5s-3.69-.311-4.785-.793"
+          />
+        </svg>
+        Clear ¹
+      </span>
+      <span class="deleteall">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          fill="currentColor"
+          class="bi bi-trash2-fill"
+          viewBox="0 0 16 16"
+        >
+          <path
+            d="M2.037 3.225A.7.7 0 0 1 2 3c0-1.105 2.686-2 6-2s6 .895 6 2a.7.7 0 0 1-.037.225l-1.684 10.104A2 2 0 0 1 10.305 15H5.694a2 2 0 0 1-1.973-1.671zm9.89-.69C10.966 2.214 9.578 2 8 2c-1.58 0-2.968.215-3.926.534-.477.16-.795.327-.975.466.18.14.498.307.975.466C5.032 3.786 6.42 4 8 4s2.967-.215 3.926-.534c.477-.16.795-.327.975-.466-.18-.14-.498-.307-.975-.466z"
+          />
+        </svg>
+        Clear history</span
+      >
+    
+      <span class="removerecent">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-minus" viewBox="0 0 16 16">
+  <path d="M5.5 9a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5"/>
+  <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/>
+</svg>
+        Remove recent (1) </span
+      >
+
+       <span class="clearlog">
+      <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 22H5C3.34315 22 2 20.6569 2 19V3C2 2.44772 2.44772 2 3 2H17C17.5523 2 18 2.44772 18 3V15H22V19C22 20.6569 20.6569 22 19 22ZM18 17V19C18 19.5523 18.4477 20 19 20C19.5523 20 20 19.5523 20 19V17H18ZM16 20V4H4V19C4 19.5523 4.44772 20 5 20H16ZM6 7H14V9H6V7ZM6 11H14V13H6V11ZM6 15H11V17H6V15Z"></path></svg>
+        </svg>
+        Clear Log</span
+      >
+         <span class="cleardata">
+     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-folder-minus" viewBox="0 0 16 16">
+  <path d="m.5 3 .04.87a2 2 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H9v-1H2.826a1 1 0 0 1-.995-.91l-.637-7A1 1 0 0 1 2.19 4h11.62a1 1 0 0 1 .996 1.09L14.54 8h1.005l.256-2.819A2 2 0 0 0 13.81 3H9.828a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 6.172 1H2.5a2 2 0 0 0-2 2m5.672-1a1 1 0 0 1 .707.293L7.586 3H2.19q-.362.002-.683.12L1.5 2.98a1 1 0 0 1 1-.98z"/>
+  <path d="M11 11.5a.5.5 0 0 1 .5-.5h4a.5.5 0 1 1 0 1h-4a.5.5 0 0 1-.5-.5"/>
+</svg> Delete app Data ( ~/output)
+        </span
+      >
+        <span class="movedata">
+     <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.4142 5H21C21.5523 5 22 5.44772 22 6V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H10.4142L12.4142 5ZM4 5V19H20V7H11.5858L9.58579 5H4ZM12 12V9L16 13L12 17V14H8V12H12Z"></path></svg> Move movies and shows (to /media)
+        </span
+      >
+    </div>
+    <div class="options-log">
+      <span class="log-header">Log</span>
+      <div class="log-content">
+        </div>
+    </div>
+
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>Download History</h2>
+        <span class="sidebar-header-menu"
+          ><input class="side-check" type="checkbox" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            class="bi bi-menu-button menu"
+            viewBox="0 0 16 16"
+          >
+            <path
+              d="M0 1.5A1.5 1.5 0 0 1 1.5 0h8A1.5 1.5 0 0 1 11 1.5v2A1.5 1.5 0 0 1 9.5 5h-8A1.5 1.5 0 0 1 0 3.5zM1.5 1a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5z"
+            />
+            <path
+              d="m7.823 2.823-.396-.396A.25.25 0 0 1 7.604 2h.792a.25.25 0 0 1 .177.427l-.396.396a.25.25 0 0 1-.354 0M0 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm1 3v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2zm14-1V8a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2zM2 8.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0 4a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5"
+            />
+          </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            class="bi bi-x-lg close"
+            viewBox="0 0 16 16"
+          >
+            <path
+              d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"
+            />
+          </svg>
+        </span>
+      </div>
+      <ul class="sidebar-list"></ul>
+    </div>
+    <script src="/js/main.js"></script>
+  </body>
+</html>
