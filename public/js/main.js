@@ -59,27 +59,61 @@ let isFirstScroll = true;
 
 
 sidebar.addEventListener('scroll', () => {
-	if(window.innerWidth <= 968) {
-	if (sidebar.scrollTop > 0 && !sidebar.classList.contains('expanded')) {
-		sidebar.classList.add('expanded');
-		isFirstScroll = true;
-	} else if (sidebar.scrollTop === 0 && sidebar.classList.contains('expanded')) {
-		sidebar.classList.remove('expanded');
-		isFirstScroll = false;
-	}
+    console.log(sidebar.scrollTop);
 
-	clearTimeout(scrollTimeout);
+    if (sidebar.scrollTop > 0 && !sidebar.classList.contains('expanded')) {
+        sidebar.classList.add('expanded');
+	
+        isFirstScroll = true;
+    } else if (sidebar.scrollTop === 0 && sidebar.classList.contains('expanded') && !isFirstScroll) {
+        sidebar.classList.remove('expanded');
+        isFirstScroll = false;
+    }
 
-	scrollTimeout = setTimeout(() => {
+    // clearTimeout(scrollTimeout);
 
-		if (sidebar.classList.contains('expanded') && isFirstScroll) {
-			sidebar.scrollTop = 1;
-		}
-		isFirstScroll = false;
-	}, 50);
+    // scrollTimeout = setTimeout(() => {
+    //     if (sidebar.classList.contains('expanded') && isFirstScroll) {
+    //         sidebar.scrollTop = 1;
+    //     }
 
-}
+    //     isFirstScroll = false;
+    // }, 50);
 });
+
+let touchStartY = 0;
+
+sidebar.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+sidebar.addEventListener('touchmove', (e) => {
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+
+    if (
+        sidebar.classList.contains('expanded') &&
+        sidebar.scrollTop === 0 &&
+        deltaY > 1
+    ) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+
+
+sidebar.addEventListener('touchend', (e) => {
+    const deltaY = e.changedTouches[0].clientY - touchStartY;
+
+    if (
+        sidebar.classList.contains('expanded') &&
+        sidebar.scrollTop === 0 &&
+        deltaY > 50
+    ) {
+        sidebar.classList.remove('expanded');
+        isFirstScroll = false;
+    }
+}, { passive: true });
 
 let clearState = false;
 
@@ -205,7 +239,7 @@ deleteOne.addEventListener('click', async function () {
 		clearState = false;
 		return;
 	}
-	console.log(value);
+	
 	fetch('/deleteOne', {
 		method: 'POST',
 		headers: {
@@ -421,7 +455,7 @@ downloadButton.addEventListener('click', function () {
 
 });
 
-const eventSource = new EventSource(`${window.location.origin}/stream-logs`);
+const eventSource = new EventSource(`/stream-logs`);
 
 eventSource.onmessage = (event) => {
 

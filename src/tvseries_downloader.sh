@@ -229,7 +229,7 @@ if [[ "$SKIP_DL" == "false" ]]; then
     echo >&2
 
     GDOWN_CODE=0
-    (cd "$JOB_DL_DIR" && gdown "$GDRIVE_LINK" >&2) || GDOWN_CODE=$?
+    (cd "$JOB_DL_DIR" && gdown --cookies-from-browser firefox "$GDRIVE_LINK" >&2) || GDOWN_CODE=$?
     if [[ $GDOWN_CODE -ne 0 ]]; then
         json_error "Download failed or was cancelled (gdown exit code $GDOWN_CODE)."
     fi
@@ -244,6 +244,14 @@ if [[ "$SKIP_DL" == "false" ]]; then
     fi
 
     DL_FILENAME=$(basename "$DL_FILE")
+    
+    # Prevent overwriting if a previous download had the exact same archive name
+    if [[ -f "$DOWNLOADS_DIR/$DL_FILENAME" ]]; then
+        DL_EXT="${DL_FILENAME##*.}"
+        DL_BASE="${DL_FILENAME%.*}"
+        DL_FILENAME="${DL_BASE}_${RUN_ID}.${DL_EXT}"
+    fi
+
     mv -f "$DL_FILE" "$DOWNLOADS_DIR/$DL_FILENAME" || json_error "Failed to move downloaded file to $DOWNLOADS_DIR."
     
     rm -rf "$JOB_DL_DIR" 2>/dev/null || true
@@ -257,7 +265,7 @@ fi
 
 WAS_EXTRACTED="false"
 
-# 9. Extraction Phase
+# 9. Extraction Phase (Unpacks into staging/extracted_<RUN_ID>)
 if [[ "$WORKING_SOURCE" =~ \.[Zz][Ii][Pp]$ ]] || file "$WORKING_SOURCE" 2>/dev/null | grep -qi "zip archive"; then
     WAS_EXTRACTED="true"
     SOURCE_FILENAME=$(basename "$WORKING_SOURCE")
@@ -272,16 +280,16 @@ if [[ "$WORKING_SOURCE" =~ \.[Zz][Ii][Pp]$ ]] || file "$WORKING_SOURCE" 2>/dev/n
         json_error "ZIP Extraction failed (exit code $UNZIP_CODE). File might be corrupted."
     fi
     FILEBOT_INPUT="$EXTRACT_DIR"
-    FILEBOT_ACTION="move"
+    FILEBOT_ACTION="move" # Moves out of extracted folder into FileBot staging (zero duplicate space)
     echo "Extraction complete." >&2
 else
     FILEBOT_INPUT="$WORKING_SOURCE"
     FILEBOT_ACTION="copy"
 fi
 
-echo -e "\nRunning FileBot...\n" >&2
+echo -e "\nRunning FileBot into Staging...\n" >&2
 
-# 10. FileBot Phase
+# 10. FileBot Phase (Organizes inside staging/filebot_<RUN_ID>)
 STAGE_DIR="$STAGING_BASE/filebot_${RUN_ID}"
 mkdir -p "$STAGE_DIR"
 
@@ -293,7 +301,7 @@ if [[ "$MEDIA_TYPE" == "tv" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "$MEDIA_NAME/Season {s.pad(2)}/Episode {e.pad(2)} - {t}" >&2 || FB_CODE=$?
+        --format "$MEDIA_NAME/Season {s.pad(2)}/Episode {e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         json_error "FileBot TV renaming process failed (exit code $FB_CODE)."
@@ -305,7 +313,7 @@ elif [[ "$MEDIA_TYPE" == "anime" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)} - {t}" >&2 || FB_CODE=$?
+        --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         echo "TVmaze lookup failed for anime, falling back to AniDB..." >&2
@@ -316,7 +324,7 @@ elif [[ "$MEDIA_TYPE" == "anime" ]]; then
             --q "$MEDIA_NAME" \
             -non-strict \
             --output "$STAGE_DIR" \
-            --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)} - {t}" >&2 || FB_CODE=$?
+            --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)}" >&2 || FB_CODE=$?
         
         if [[ $FB_CODE -ne 0 ]]; then
             json_error "FileBot Anime renaming process failed on both TVmaze and AniDB (exit code $FB_CODE)."
@@ -336,7 +344,21 @@ else
     fi
 fi
 
-# 11. Finalizing (Move from Staging to output/shows, output/anime, or output/movies)
+# Helper function to move staged files/seasons into target directory without failing if Season folders already exist
+move_staged_tree() {
+    local src_dir="$1"
+    local dst_dir="$2"
+    mkdir -p "$dst_dir"
+
+    while IFS= read -r -d '' src_file; do
+        local rel_path="${src_file#$src_dir/}"
+        local target_file="$dst_dir/$rel_path"
+        mkdir -p "$(dirname "$target_file")"
+        mv -f "$src_file" "$target_file" || return 1
+    done < <(find "$src_dir" -type f -print0)
+}
+
+# 11. Finalizing (Instantly moves from FileBot Staging to output/shows, output/anime, or output/movies)
 if [[ "$MEDIA_TYPE" == "tv" ]]; then
     PROCESSED_SHOW_DIR=$(find "$STAGE_DIR" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null || true)
     if [[ -z "$PROCESSED_SHOW_DIR" ]]; then
@@ -344,8 +366,7 @@ if [[ "$MEDIA_TYPE" == "tv" ]]; then
     fi
 
     SHOW_FOLDER_NAME=$(basename "$PROCESSED_SHOW_DIR")
-    mkdir -p "$SHOWS_DIR/$SHOW_FOLDER_NAME"
-    cp -rf "$PROCESSED_SHOW_DIR/"* "$SHOWS_DIR/$SHOW_FOLDER_NAME/" || json_error "Failed to copy processed TV episodes to $SHOWS_DIR."
+    move_staged_tree "$PROCESSED_SHOW_DIR" "$SHOWS_DIR/$SHOW_FOLDER_NAME" || json_error "Failed to move TV episodes to $SHOWS_DIR."
     FINAL_OUTPUT_PATH="$SHOWS_DIR/$SHOW_FOLDER_NAME"
 elif [[ "$MEDIA_TYPE" == "anime" ]]; then
     PROCESSED_ANIME_DIR=$(find "$STAGE_DIR" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null || true)
@@ -354,8 +375,7 @@ elif [[ "$MEDIA_TYPE" == "anime" ]]; then
     fi
 
     ANIME_FOLDER_NAME=$(basename "$PROCESSED_ANIME_DIR")
-    mkdir -p "$ANIME_DIR/$ANIME_FOLDER_NAME"
-    cp -rf "$PROCESSED_ANIME_DIR/"* "$ANIME_DIR/$ANIME_FOLDER_NAME/" || json_error "Failed to copy processed Anime episodes to $ANIME_DIR."
+    move_staged_tree "$PROCESSED_ANIME_DIR" "$ANIME_DIR/$ANIME_FOLDER_NAME" || json_error "Failed to move Anime episodes to $ANIME_DIR."
     FINAL_OUTPUT_PATH="$ANIME_DIR/$ANIME_FOLDER_NAME"
 else
     PROCESSED_MOVIE=$(find "$STAGE_DIR" -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" \) -print -quit 2>/dev/null || true)

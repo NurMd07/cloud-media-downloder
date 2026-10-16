@@ -10,6 +10,7 @@
         font-family: "Inter", sans-serif;
         color: #172033;
         background: #f4f7fb;
+        overflow: hidden;
       }
 
       * {
@@ -349,7 +350,7 @@
         padding-top: 1em;
         word-break: normal;
         overflow-y: scroll;
-        overflow-x: visible;
+        overflow-x: hidden;
       }
 
       .sidebar-list {
@@ -513,7 +514,7 @@
 
         padding: 1.2em 1.5em;
 
-        gap: 1.2em;
+        gap: 1.8em;
         width: 45% !important;
         flex-wrap: wrap;
       }
@@ -580,7 +581,7 @@
       .options .deleteall,
       .options .cleardata,
       .options .movedata,
-      .options .clearlog ,
+      .options .clearlog,
       .options .removerecent {
         padding: 0.6em 0.8em;
         font-size: 0.8rem !important;
@@ -689,7 +690,7 @@
 
         user-select: none;
         margin-bottom: 5px;
-   
+
         cursor: pointer;
         font-size: 1rem;
         letter-spacing: 0.8px;
@@ -699,7 +700,8 @@
         color: #fff;
 
       }
-     .options .removerecent {
+
+      .options .removerecent {
 
         user-select: none;
         margin-bottom: 5px;
@@ -709,10 +711,11 @@
         letter-spacing: 0.8px;
         font-weight: 600;
 
-        background-color:  rgb(61, 142, 208);
+        background-color: rgb(61, 142, 208);
         color: #fff;
 
       }
+
       .log-content {
         width: 100%;
         height: 100%;
@@ -765,7 +768,46 @@
         line-height: 1.5em;
       }
 
+
+
+      .more-options {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+      }
+
+      .more-options svg {
+        width: 1.2rem;
+        height: 1.2rem;
+        color: #ffffff67;
+      }
+
+      .more-options:hover svg {
+        color: #ffffff;
+      }
+
+      .more-options:active svg {
+        color: #ffffffa1;
+      }
+
+
+
+
+
+
       @media (max-width: 768px) {
+        .more-options {
+          position: absolute;
+          right: 1em;
+        }
+
+        .reset {
+          right: 1em;
+          bottom: 0.5em;
+
+        }
+
         h1 .title {
           font-size: 1.4rem;
         }
@@ -782,6 +824,7 @@
           border-radius: 0;
           padding-top: 1.5em;
           min-height: 88dvh !important;
+
         }
 
 
@@ -803,7 +846,7 @@
         .options {
           width: 100%;
 
-          padding: 1em;
+          padding: 1.5em;
           box-sizing: border-box;
           flex-direction: column;
           flex-wrap: nowrap;
@@ -819,7 +862,7 @@
 
         .options .options-log {
           width: 100%;
-          height: 45dvh;
+          height: 47dvh;
 
         }
 
@@ -873,25 +916,11 @@
           width: 2.1em;
           height: 2.1em;
         }
-      }
 
-      .more-options {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-      }
+        .options .options-menu {
+          gap: 1em;
+          padding: 0;
+          margin-bottom: 1em;
+        }
 
-      .more-options svg {
-        width: 1.2rem;
-        height: 1.2rem;
-        color: #ffffff67;
-      }
-
-      .more-options:hover svg {
-        color: #ffffff;
-      }
-
-      .more-options:active svg {
-        color: #ffffffa1;
       }
