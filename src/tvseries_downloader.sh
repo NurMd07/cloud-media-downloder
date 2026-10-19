@@ -229,7 +229,7 @@ if [[ "$SKIP_DL" == "false" ]]; then
     echo >&2
 
     GDOWN_CODE=0
-    (cd "$JOB_DL_DIR" && gdown --cookies-from-browser firefox "$GDRIVE_LINK" >&2) || GDOWN_CODE=$?
+    (cd "$JOB_DL_DIR" && TQDM_MININTERVAL=5 gdown --cookies-from-browser firefox "$GDRIVE_LINK" >&2) || GDOWN_CODE=$?
     if [[ $GDOWN_CODE -ne 0 ]]; then
         json_error "Download failed or was cancelled (gdown exit code $GDOWN_CODE)."
     fi
@@ -301,7 +301,7 @@ if [[ "$MEDIA_TYPE" == "tv" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "$MEDIA_NAME/Season {s.pad(2)}/Episode {e.pad(2)}" >&2 || FB_CODE=$?
+        --format "$MEDIA_NAME/Season {s.pad(2)}/{n} - S{s.pad(2)}E{e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         json_error "FileBot TV renaming process failed (exit code $FB_CODE)."
@@ -313,7 +313,7 @@ elif [[ "$MEDIA_TYPE" == "anime" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)}" >&2 || FB_CODE=$?
+        --format "$MEDIA_NAME/{any{'Season '+s.pad(2)}{'Season 01'}}/{n} - S{s.pad(2)}E{e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         echo "TVmaze lookup failed for anime, falling back to AniDB..." >&2

@@ -22,6 +22,19 @@ const animeLabel = document.querySelector('label[for="anime"]');
 const moreOptionsIcon = document.querySelector('.more-options svg');
 const moreOptionsIconLeft = document.querySelector('.more-options svg:nth-child(2)');
 const removeRecent = document.querySelector('.removerecent');
+const logSwitcher = document.querySelector('.log-switcher');
+const logContainer = document.querySelector('.options-log');
+const optionsContainer = document.querySelector('.options-menu');
+
+logSwitcher.addEventListener('click', function () {
+	
+	logContainer.classList.toggle('show');
+
+	optionsContainer.classList.toggle('hide');
+	
+});
+
+
 
 removeRecent.addEventListener('click', function () {
 	fetch('/removeRecent', {
@@ -70,15 +83,6 @@ sidebar.addEventListener('scroll', () => {
         isFirstScroll = false;
     }
 
-    // clearTimeout(scrollTimeout);
-
-    // scrollTimeout = setTimeout(() => {
-    //     if (sidebar.classList.contains('expanded') && isFirstScroll) {
-    //         sidebar.scrollTop = 1;
-    //     }
-
-    //     isFirstScroll = false;
-    // }, 50);
 });
 
 let touchStartY = 0;
@@ -169,7 +173,71 @@ function fetchItems() {
 
 }
 
+
+const storageInfoContainer = document.querySelector('.storageinfo');
+
+function fetchStorageInfo() {
+	fetch('/getStorageInfo', {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	})
+		.then(response => response.json())
+		.then(data => {
+			storageInfoContainer.innerHTML = ''; // Clear the existing storage info before fetching new data
+			data.forEach(disk => {
+			
+				console.log('Disk Info:', disk); // Log the disk info to the console for debugging
+			const storage = document.createElement('div');
+			storage.classList.add('storage');
+
+			const storageName = document.createElement('span');
+			storageName.classList.add('storage-name');
+
+			storageName.textContent = disk.mount.split('/').pop()===""?"Root":disk.mount.split('/').pop();
+			
+				storage.appendChild(storageName);
+
+			const storagePath = document.createElement('span');
+			storagePath.classList.add('storage-path');
+			storagePath.textContent = disk.mount;
+
+			storage.appendChild(storagePath);
+
+			const storageProgress = document.createElement('div');
+			storageProgress.classList.add('storage-progress');
+			const progressBar = document.createElement('progress');
+			progressBar.max = 100;
+			progressBar.value = disk.usagePercent;
+			storageProgress.appendChild(progressBar);
+
+			storage.appendChild(storageProgress);
+
+			const storageSubinfo = document.createElement('div');
+			storageSubinfo.classList.add('storage-subinfo');
+			const storageUsagePercentage = document.createElement('span');
+			storageUsagePercentage.classList.add('storage-usage-percentage');
+			const storageUsage = document.createElement('span');
+			storageUsage.classList.add('storage-usage');
+			storageUsagePercentage.textContent = `${disk.usagePercent.toFixed(2)}%`;
+			storageUsage.textContent = `${disk.usedGB.toFixed(2)} GB / ${disk.totalGB.toFixed(2)} GB`;
+			storageSubinfo.appendChild(storageUsagePercentage);
+			storageSubinfo.appendChild(storageUsage);
+			storage.appendChild(storageSubinfo);
+
+			storageInfoContainer.appendChild(storage);
+			});
+		}).catch(error => {
+			console.error('Error fetching storage info:', error);
+		});
+}
+
 fetchItems();
+fetchStorageInfo();
+
+window.setInterval(fetchItems, 15000); // Fetch items every 5 seconds
+window.setInterval(fetchStorageInfo, 30000); // Fetch storage info every 30 seconds	
 
 function waitForItemClick() {
 	return new Promise((resolve) => {
@@ -471,11 +539,8 @@ eventSource.onmessage = (event) => {
 	}).replace(",", "")}]`;
 	;
 
-
 	logContent.innerHTML += `<div class="log-line"><span class="log-timestamp">${timestamp}</span><span> ${data.message}</span></div>\n`;
 
-
-	// Auto-scroll to bottom
 	logContent.scrollTop = logContent.scrollHeight;
 };
 

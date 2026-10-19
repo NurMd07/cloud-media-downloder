@@ -6,6 +6,7 @@ import { JSONFilePreset } from 'lowdb/node';
 import { spawn } from "child_process";
 import fs from "fs";
 import chokidar from 'chokidar';
+import si from 'systeminformation';
 
 dotenv.config();
 
@@ -23,6 +24,27 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+
+async function getStorageInfo() {
+    const disks = await si.fsSize();
+
+    const result = disks
+        .sort((a, b) => b.size - a.size)
+        .slice(0, 3)
+        .filter(name=> name.mount !== '/media')
+        .map(disk => ({
+            mount: disk.mount,
+            filesystem: disk.fs,
+            totalGB: +(disk.size / 1024 ** 3).toFixed(2),
+            usedGB: +(disk.used / 1024 ** 3).toFixed(2),
+            freeGB: +((disk.size - disk.used) / 1024 ** 3).toFixed(2),
+            usagePercent: disk.use
+        }));
+
+  
+    return result;
+}
 
 app.get("/", (req, res) => {
 	res.render("index");
@@ -188,93 +210,17 @@ app.get("/moveData", async (req, res) => {
 
 const LOG_FILE = path.resolve(__dirname, 'downloader.log');
 
-// app.get('/stream-logs', (req, res) => {
 
-// 	// SSE Headers
-// 	res.writeHead(200, {
-// 		'Content-Type': 'text/event-stream',
-// 		'Cache-Control': 'no-cache',
-// 		'Connection': 'keep-alive',
-// 	});
-
-// 	const sendLog = (data) => {
-//     const message = data.trim();
-//     if (message) {
-//         res.write(`data: ${JSON.stringify({ message })}\n\n`);
-//     }
-// };
-
-// let fileSize = 0;
-
-// try {
-//     if (!fs.existsSync(LOG_FILE)) {
-//         fs.writeFileSync(LOG_FILE, '');
-//     }
-
-//     fileSize = fs.statSync(LOG_FILE).size;
-// } catch (err) {
-//     console.error('Log file initialization error:', err);
-//     return res.end();
-// }
-
-// const readNewBytes = (path, start, end) => {
-//     if (end <= start) return;
-
-//     const stream = fs.createReadStream(path, {
-//         start,
-//         end: end - 1
-//     });
-
-//     stream.on('data', (chunk) => {
-//         chunk.toString().split('\n').forEach(sendLog);
-//     });
-
-//     stream.on('error', (err) => {
-//         console.error('Log stream error:', err);
-//     });
-// };
-
-// const watcher = chokidar.watch(LOG_FILE, {
-//     persistent: true,
-//     usePolling: true,
-//     interval: 100
-// });
-
-// watcher.on('change', (path) => {
-//     try {
-//         const stats = fs.statSync(path);
-
-//         if (stats.size > fileSize) {
-//             const previousSize = fileSize;
-//             fileSize = stats.size;
-//             readNewBytes(path, previousSize, stats.size);
-//         } else if (stats.size < fileSize) {
-//             fileSize = stats.size;
-//         }
-//     } catch (err) {
-//         console.error('Log watcher error:', err);
-//     }
-// });
-
-// watcher.on('error', (err) => {
-//     console.error('Chokidar error:', err);
-// });
-
-// req.on('close', () => {
-//     watcher.close();
-// });
-// });
-
-const MAX_LOG_SIZE = 256 * 1024; // 256 KB max file size before trimming
-const KEEP_LOG_SIZE = 64 * 1024; // Retain newest 64 KB after trimming
+const MAX_LOG_SIZE = 64 * 1024; // 128 KB max before auto-trimming
+const KEEP_LOG_SIZE = 32 * 1024; // Keep the newest 64 KB after trimming
 let isRotatingLog = false;
 
 function trimLogFileIfNeeded() {
-    if (isRotatingLog) return;
+    if (isRotatingLog) return false;
     try {
-        if (!fs.existsSync(LOG_FILE)) return;
+        if (!fs.existsSync(LOG_FILE)) return false;
         const stats = fs.statSync(LOG_FILE);
-        if (stats.size <= MAX_LOG_SIZE) return;
+        if (stats.size <= MAX_LOG_SIZE) return false;
 
         isRotatingLog = true;
         const fd = fs.openSync(LOG_FILE, "r");
@@ -292,30 +238,12 @@ function trimLogFileIfNeeded() {
 
         const header = `--- [SYSTEM] Old logs auto-cleared to keep page fast ---\n`;
         fs.writeFileSync(LOG_FILE, header + trimmedContent, "utf8");
+        return true;
     } catch (err) {
         console.error("Error auto-trimming log file:", err);
+        return false;
     } finally {
         isRotatingLog = false;
-    }
-}
-
-function appendAndRotateLog(logMessage) {
-    try {
-        fs.appendFile(LOG_FILE, `${logMessage}\n`, (err) => {
-            if (err) {
-                console.error("Failed to write log:", err);
-                return;
-            }
-            if (!isRotatingLog) {
-                fs.stat(LOG_FILE, (statErr, stats) => {
-                    if (!statErr && stats && stats.size > MAX_LOG_SIZE) {
-                        trimLogFileIfNeeded();
-                    }
-                });
-            }
-        });
-    } catch (err) {
-        console.error("Unexpected error in appendAndRotateLog:", err);
     }
 }
 
@@ -346,19 +274,19 @@ app.get("/stream-logs", (req, res) => {
             fs.writeFileSync(LOG_FILE, "", "utf8");
         }
 
-        // Trim immediately if the log file is already heavy when opening the page
+        // 1. Trim immediately if the log file is already over 128 KB when opening the page
         trimLogFileIfNeeded();
 
         let fileSize = fs.statSync(LOG_FILE).size;
 
-        const readNewBytes = (filePath, start, end) => {
-            if (end <= start || res.writableEnded) return;
+        // Helper to read only newly appended bytes during live chokidar updates
+        const readNewBytes = (filePath, start, end, onComplete) => {
+            if (end <= start || res.writableEnded) {
+                if (onComplete) onComplete();
+                return;
+            }
 
-            const stream = fs.createReadStream(filePath, {
-                start,
-                end: end - 1
-            });
-
+            const stream = fs.createReadStream(filePath, { start, end: end - 1 });
             let leftover = "";
 
             stream.on("data", (chunk) => {
@@ -368,31 +296,49 @@ app.get("/stream-logs", (req, res) => {
             });
 
             stream.on("end", () => {
-                if (leftover) sendLog(leftover);
+                if (leftover && !res.writableEnded) sendLog(leftover);
+                if (onComplete) onComplete();
             });
 
             stream.on("error", (err) => {
                 console.error("Log stream error:", err);
+                if (onComplete) onComplete();
             });
         };
 
-        // Delay initial history load by 600ms so the browser UI renders without freezing
-        const INITIAL_DELAY_MS = 600;
+        // 2. Delayed Initial History Load (Gentle batching: 10 lines every 15ms)
+        const INITIAL_DELAY_MS = 0;
         initialLoadTimer = setTimeout(() => {
             try {
                 if (!res.writableEnded && fs.existsSync(LOG_FILE)) {
-                    const currentSize = fs.statSync(LOG_FILE).size;
-                    fileSize = currentSize;
-                    if (currentSize > 0) {
-                        const startByte = Math.max(0, currentSize - KEEP_LOG_SIZE);
-                        readNewBytes(LOG_FILE, startByte, currentSize);
-                    }
+                    const content = fs.readFileSync(LOG_FILE, "utf8");
+                    fileSize = Buffer.byteLength(content, "utf8");
+
+                    const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+                    // Keep only the last 150 lines on initial load so it opens instantly
+                    const recentLines = lines.slice(-150);
+
+                    let index = 0;
+                    const batchSize = 10; // Push 10 lines at a time
+
+                    const sendBatch = () => {
+                        if (res.writableEnded || index >= recentLines.length) return;
+
+                        const batch = recentLines.slice(index, index + batchSize);
+                        batch.forEach(sendLog);
+                        index += batchSize;
+
+                        setTimeout(sendBatch, 15); // 15ms pause between batches = perfectly smooth
+                    };
+
+                    sendBatch();
                 }
             } catch (err) {
                 console.error("Error reading initial log history:", err);
             }
         }, INITIAL_DELAY_MS);
 
+        // 3. Watch for live changes (Instant delivery + auto-trim if > 128 KB)
         watcher = chokidar.watch(LOG_FILE, {
             persistent: true,
             usePolling: true,
@@ -401,12 +347,19 @@ app.get("/stream-logs", (req, res) => {
 
         watcher.on("change", (filePath) => {
             try {
-                if (!fs.existsSync(filePath)) return;
+                if (!fs.existsSync(filePath) || isRotatingLog) return;
                 const stats = fs.statSync(filePath);
 
                 if (stats.size > fileSize) {
-                    readNewBytes(filePath, fileSize, stats.size);
+                    const previousSize = fileSize;
                     fileSize = stats.size;
+
+                    // Stream live updates instantly, then trim if file crossed 128 KB
+                    readNewBytes(filePath, previousSize, stats.size, () => {
+                        if (stats.size > MAX_LOG_SIZE && trimLogFileIfNeeded()) {
+                            fileSize = fs.statSync(filePath).size;
+                        }
+                    });
                 } else if (stats.size < fileSize) {
                     // File was cleared or auto-rotated
                     fileSize = stats.size;
@@ -518,6 +471,17 @@ app.get("/removeRecent", async (req, res) => {
 	}
 	await db.write();
 	res.json({ message: "Removed the most recent entry from the database" });
+});
+
+
+app.get("/getStorageInfo", async (req, res) => {
+    try {
+        const storageInfo = await getStorageInfo();
+        res.json(storageInfo);
+    } catch (error) {
+        console.error("Error fetching storage info:", error);
+        res.status(500).json({ error: "Failed to fetch storage info" });
+    }
 });
 
 app.listen(port, () => {

@@ -264,7 +264,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 1.2rem;
+        gap: 1rem;
         margin-top: 0.2rem;
       }
 
@@ -502,11 +502,11 @@
         position: absolute;
         transform: scale(0);
         flex-wrap: wrap;
-        gap: 1.2em;
+
         width: 80%;
-        height: 60vh;
+        height: 73vh;
         background: rgba(0, 0, 0, 0.4);
-        padding: 2.4em 1.5em;
+        padding: 0 2em !important;
       }
 
       .options .options-menu {
@@ -515,16 +515,16 @@
         padding: 1.2em 1.5em;
 
         gap: 1.8em;
-        width: 45% !important;
+        width: 48% !important;
         flex-wrap: wrap;
       }
 
       .options .options-log {
 
 
-        width: 45%;
+        width: 48% !important;
         background-color: rgba(255, 255, 255, 0.1);
-        height: 45vh;
+        height: 60vh;
         border-radius: 8px;
         display: flex;
         flex-direction: column;
@@ -781,6 +781,7 @@
         width: 1.2rem;
         height: 1.2rem;
         color: #ffffff67;
+
       }
 
       .more-options:hover svg {
@@ -791,15 +792,146 @@
         color: #ffffffa1;
       }
 
+      .storageinfo {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        height: fit-content;
+        row-gap: 1em;
+        padding: 1em 1.2em;
+        background-color: rgba(0, 0, 0, 0.4);
+        border-radius: 8px;
+        margin-bottom: 1em;
 
+      }
 
+      .storage {
 
+        display: flex;
+        flex-wrap: wrap;
+        flex-direction: column;
+        row-gap: 0.3em;
+      }
 
+      .storage-name {
+        width: 100%;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+      }
+
+      .storage-path {
+
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.7rem;
+
+      }
+
+      .storage-usage,
+      .storage-usage-percentage {
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.8);
+  
+      }
+
+      .storage-usage-percentage {
+        color: #22C55E;
+      }
+
+      .storage-subinfo {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .storage-progress {
+        width: 100%;
+
+        background-color: rgba(255, 255, 255, 0.1);
+        font-size: 0.3em;
+
+        line-height: 0.3em;
+      }
+
+      .storage-progress progress {
+        width: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+        border: none;
+
+        border-radius: 8px;
+        overflow: hidden;
+        background: #9E9E9E;
+      }
+
+      /* Gray unfilled track */
+      .storage-progress progress::-webkit-progress-bar {
+        background: #9E9E9E;
+        border-radius: 8px;
+      }
+
+      /* Green filled portion in Chrome, Edge, Safari */
+      .storage-progress progress::-webkit-progress-value {
+        background: #22C55E;
+        border-radius: 8px;
+      }
+
+      /* Green filled portion in Firefox */
+      .storage-progress progress::-moz-progress-bar {
+        background: #22C55E;
+        border-radius: 8px;
+      }
+
+      .show {
+        visibility: visible !important;
+      }
+
+      .hide {
+        visibility: hidden !important;
+      }
 
       @media (max-width: 768px) {
+        .log-switcher {
+          display: flex !important;
+          position: absolute;
+          top: 1em;
+          right: 1em;
+          cursor: pointer;
+          z-index: 1000;
+          background-color: rgba(0, 0, 0, 0.1);
+          padding: 0.6em;
+          border-radius: 50%;
+
+        }
+
+        .log-switcher:hover {
+          background-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .log-switcher:active {
+          background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .log-switcher svg {
+          width: 1.2rem;
+          height: 1.2rem;
+          color: #ffffffc1;
+        }
+
         .more-options {
           position: absolute;
           right: 1em;
+        }
+
+        .options .options-menu {
+          justify-content: center;
+        }
+
+        .storageinfo {
+
+          margin: 1.5em 0;
+          padding: 1em;
         }
 
         .reset {
@@ -846,10 +978,12 @@
         .options {
           width: 100%;
 
-          padding: 1.5em;
+
+          padding: 1.5em !important;
+          padding-top: 2em !important;
           box-sizing: border-box;
           flex-direction: column;
-          flex-wrap: nowrap;
+
           margin: 0;
           justify-content: center;
           align-items: center;
@@ -858,13 +992,20 @@
 
         .options .options-menu {
           width: 100% !important;
+
         }
 
         .options .options-log {
-          width: 100%;
-          height: 47dvh;
+          visibility: hidden;
+          position: absolute;
+          width: 90% !important;
+          margin-top: 2em;
+          height: 65vh;
+          z-index: 1000;
+          overflow-y: hidden;
 
         }
+
 
         .options .deleteone,
         .options .deleteall,
@@ -874,7 +1015,7 @@
         .options .removerecent {
           width: fit-content;
           font-size: 0.6rem !important;
-          padding: 0.6em 1em;
+          padding: 0.8em 1em;
         }
 
         .options .deleteone svg,
@@ -918,9 +1059,9 @@
         }
 
         .options .options-menu {
-          gap: 1em;
+          gap: 1.5em;
           padding: 0;
-          margin-bottom: 1em;
+
         }
 
       }

@@ -238,7 +238,7 @@ if [[ "$MEDIA_TYPE" == "tv" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "{n}/Season {s.pad(2)}/Episode {e.pad(2)} - {t}" >&2 || FB_CODE=$?
+        --format "{n}/Season {s.pad(2)}/{n} - S{s.pad(2)}E{e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         json_error "FileBot TV renaming process failed (exit code $FB_CODE)."
@@ -250,7 +250,7 @@ elif [[ "$MEDIA_TYPE" == "anime" ]]; then
         --q "$MEDIA_NAME" \
         -non-strict \
         --output "$STAGE_DIR" \
-        --format "{n}/{any{'Season '+s.pad(2)}{'Season 01'}}/Episode {e.pad(2)} - {t}" >&2 || FB_CODE=$?
+        --format "{n}/{any{'Season '+s.pad(2)}{'Season 01'}}/{n} - S{s.pad(2)}E{e.pad(2)}" >&2 || FB_CODE=$?
     
     if [[ $FB_CODE -ne 0 ]]; then
         echo "TVmaze lookup failed for anime, falling back to AniDB..." >&2
