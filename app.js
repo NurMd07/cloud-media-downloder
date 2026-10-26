@@ -7,6 +7,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import chokidar from 'chokidar';
 import si from 'systeminformation';
+import { execFileSync } from 'node:child_process';
 
 dotenv.config();
 
@@ -27,23 +28,23 @@ app.use(express.json());
 
 
 async function getStorageInfo() {
-    const disks = await si.fsSize();
+	const disks = await si.fsSize();
 
-    const result = disks
-        .sort((a, b) => b.size - a.size)
-        .slice(0, 3)
-        .filter(name=> name.mount !== '/media')
-        .map(disk => ({
-            mount: disk.mount,
-            filesystem: disk.fs,
-            totalGB: +(disk.size / 1024 ** 3).toFixed(2),
-            usedGB: +(disk.used / 1024 ** 3).toFixed(2),
-            freeGB: +((disk.size - disk.used) / 1024 ** 3).toFixed(2),
-            usagePercent: disk.use
-        }));
+	const result = disks
+		.sort((a, b) => b.size - a.size)
+		.filter(name => name.mount !== '/media')
+		.slice(0, 2)
+		.map(disk => ({
+			mount: disk.mount,
+			filesystem: disk.fs,
+			totalGB: +(disk.size / 1024 ** 3).toFixed(2),
+			usedGB: +(disk.used / 1024 ** 3).toFixed(2),
+			freeGB: +((disk.size - disk.used) / 1024 ** 3).toFixed(2),
+			usagePercent: disk.use
+		}));
 
-  
-    return result;
+
+	return result;
 }
 
 app.get("/", (req, res) => {
@@ -53,15 +54,31 @@ app.get("/", (req, res) => {
 const googleDriveFileRegex =
 	/^https?:\/\/drive\.google\.com\/file\/d\/[^/?#]+(?:\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i;
 
-app.post("/download", async (req, res) => {
+const magnetLinkRegex =
+	/^magnet:\?(?=[^#\s]*\bxt=urn:btih:[a-z0-9]{32,40}(?:&|#|$))[^#\s]+(?:#.*)?$/i;
+
+const mediaFileRegex =
+	/^https?:\/\/[^\s?#]+\.(?:mkv|mp4|zip)(?:\?[^#]*)?(?:#.*)?$/i;
+
+
+app.post("/download/:type", async (req, res) => {
 	try {
 		let { url, override, name, category } = req.body;
+		const type = req.params.type;
+		if (!type || !['gdrive', 'siteDL', 'magnet'].includes(type)) {
+			return res.status(400).json({ error: "Invalid type parameter" });
+		}
+
 		url = url.trim().replace(/\s+/g, '');
 		name = name.trim();
 		category = category.trim();
 
-		if (!url || !googleDriveFileRegex.test(url) || !name || name.trim() === "") {
+		if (type === 'gdrive' && (!url || !googleDriveFileRegex.test(url) || !name || name.trim() === "")) {
 			return res.status(400).json({ error: "Invalid Google Drive URL" });
+		} else if (type === 'siteDL' && (!url || !mediaFileRegex.test(url) || !name || name.trim() === "")) {
+			return res.status(400).json({ error: "Invalid Media File URL" });
+		} else if (type === 'magnet' && (!url || !magnetLinkRegex.test(url) || !name || name.trim() === "")) {
+			return res.status(400).json({ error: "Invalid Magnet Link" });
 		}
 
 		await db.read();
@@ -78,24 +95,36 @@ app.post("/download", async (req, res) => {
 		}
 		await db.read();
 		const lastId = db.data.sort((a, b) => b.id - a.id)[0]?.id || 0;
-		
+
 		db.data.push({ id: lastId + 1, url: url, timestamp: new Date().toISOString(), status: "pending", category: category || "tv", name: name });
 		await db.write();
 
-		const process = spawn(`${__dirname}/src/tvseries_downloader.sh`, [
+		const args = [
 			'-i', `${lastId + 1}`,
 			'-t', `${category || "tv"}`,
 			'-n', `${name}`,
-			'-l', `${url}`
-		]);
+			'-l', `${url}`,
+			'-c', `${process.env.COOKIES || "false"}`,
+			`${type === 'gdrive' ? '-g' : type === 'siteDL' ? '-s' : '-m'}`
+		];
+
+		if (process.env.BROWSER) {
+			args.push('-b', process.env.BROWSER);
+		}
+
+		if (process.env.OUTPUT) {
+			args.push('-o', process.env.output);
+		}
+
+		const child_process = spawn(`${__dirname}/src/tvseries_downloader.sh`, args);
 
 		let jsonOutput = '';
 
-		process.stdout.on('data', (data) => {
+		child_process.stdout.on('data', (data) => {
 			jsonOutput += data.toString();
 		});
 
-		process.stderr.on('data', (data) => {
+		child_process.stderr.on('data', (data) => {
 			// data is a Buffer. Convert to string and trim extra newlines so it looks clean
 			const logMessage = data.toString().trim();
 
@@ -111,7 +140,7 @@ app.post("/download", async (req, res) => {
 			}
 		});
 
-		process.on('close', async () => {
+		child_process.on('close', async () => {
 
 			const result = JSON.parse(jsonOutput);
 
@@ -147,6 +176,7 @@ app.post("/download", async (req, res) => {
 
 });
 
+
 app.get("/items", async (req, res) => {
 	await db.read();
 	res.json(db.data);
@@ -180,6 +210,19 @@ app.get("/clearData", async (req, res) => {
 			recursive: true,
 			force: true
 		});
+		await db.read();
+		try {
+			db.data.forEach(entry => {
+				if (entry.status === "pending") {
+					spawn(`${__dirname}/src/tvseries_downloader.sh`, ["-k", String(entry.id)]);
+				}
+			});
+		} catch (err) {
+			console.error("Error killing the download process:", err);
+		}
+		db.data = [];
+		await db.write();
+
 	} catch (err) {
 		console.error("Error clearing data:", err);
 		res.status(500).json({ error: "Failed to clear data" });
@@ -192,12 +235,34 @@ app.get("/moveData", async (req, res) => {
 	try {
 		const scriptPath = path.join(__dirname, "src", "move_media.sh");
 
-		const child = spawn("bash", [scriptPath], {
+		const moveArgs = [];
+
+		if (process.env.output) {
+			moveArgs.push("-o", process.env.output);
+		}
+		if (process.env.MEDIA_DIR) {
+			moveArgs.push("-m", process.env.MEDIA_DIR);
+		}
+		if (process.env.MOVIES_DIR_NAME) {
+			moveArgs.push("--movies-dir", process.env.MOVIES_DIR_NAME);
+		}
+		if (process.env.SHOWS_DIR_NAME) {
+			moveArgs.push("--shows-dir", process.env.SHOWS_DIR_NAME);
+		}
+		if (process.env.ANIME_DIR_NAME) {
+			moveArgs.push("--anime-dir", process.env.ANIME_DIR_NAME);
+		}
+
+		const moveProcess = spawn(scriptPath, moveArgs, {
 			detached: true,
 			stdio: "ignore"
 		});
 
-		child.unref();
+		moveProcess.on("error", (err) => {
+			console.error("Failed to start move_media.sh:", err);
+		});
+
+		moveProcess.unref();
 
 		res.json({ message: "Moving all completed data to a /media directory..." });
 	} catch (err) {
@@ -216,190 +281,190 @@ const KEEP_LOG_SIZE = 32 * 1024; // Keep the newest 64 KB after trimming
 let isRotatingLog = false;
 
 function trimLogFileIfNeeded() {
-    if (isRotatingLog) return false;
-    try {
-        if (!fs.existsSync(LOG_FILE)) return false;
-        const stats = fs.statSync(LOG_FILE);
-        if (stats.size <= MAX_LOG_SIZE) return false;
+	if (isRotatingLog) return false;
+	try {
+		if (!fs.existsSync(LOG_FILE)) return false;
+		const stats = fs.statSync(LOG_FILE);
+		if (stats.size <= MAX_LOG_SIZE) return false;
 
-        isRotatingLog = true;
-        const fd = fs.openSync(LOG_FILE, "r");
-        const buffer = Buffer.alloc(KEEP_LOG_SIZE);
-        const startPos = stats.size - KEEP_LOG_SIZE;
+		isRotatingLog = true;
+		const fd = fs.openSync(LOG_FILE, "r");
+		const buffer = Buffer.alloc(KEEP_LOG_SIZE);
+		const startPos = stats.size - KEEP_LOG_SIZE;
 
-        fs.readSync(fd, buffer, 0, KEEP_LOG_SIZE, startPos);
-        fs.closeSync(fd);
+		fs.readSync(fd, buffer, 0, KEEP_LOG_SIZE, startPos);
+		fs.closeSync(fd);
 
-        let trimmedContent = buffer.toString("utf8");
-        const firstNewline = trimmedContent.indexOf("\n");
-        if (firstNewline !== -1) {
-            trimmedContent = trimmedContent.slice(firstNewline + 1);
-        }
+		let trimmedContent = buffer.toString("utf8");
+		const firstNewline = trimmedContent.indexOf("\n");
+		if (firstNewline !== -1) {
+			trimmedContent = trimmedContent.slice(firstNewline + 1);
+		}
 
-        const header = `--- [SYSTEM] Old logs auto-cleared to keep page fast ---\n`;
-        fs.writeFileSync(LOG_FILE, header + trimmedContent, "utf8");
-        return true;
-    } catch (err) {
-        console.error("Error auto-trimming log file:", err);
-        return false;
-    } finally {
-        isRotatingLog = false;
-    }
+		const header = `--- [SYSTEM] Old logs auto-cleared to keep page fast ---\n`;
+		fs.writeFileSync(LOG_FILE, header + trimmedContent, "utf8");
+		return true;
+	} catch (err) {
+		console.error("Error auto-trimming log file:", err);
+		return false;
+	} finally {
+		isRotatingLog = false;
+	}
 }
 
 app.get("/stream-logs", (req, res) => {
-    let watcher = null;
-    let heartbeat = null;
-    let initialLoadTimer = null;
+	let watcher = null;
+	let heartbeat = null;
+	let initialLoadTimer = null;
 
-    try {
-        res.writeHead(200, {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        });
+	try {
+		res.writeHead(200, {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			"Connection": "keep-alive"
+		});
 
-        const sendLog = (data) => {
-            try {
-                const message = data.trim();
-                if (message && !res.writableEnded) {
-                    res.write(`data: ${JSON.stringify({ message })}\n\n`);
-                }
-            } catch (err) {
-                console.error("SSE write error:", err);
-            }
-        };
+		const sendLog = (data) => {
+			try {
+				const message = data.trim();
+				if (message && !res.writableEnded) {
+					res.write(`data: ${JSON.stringify({ message })}\n\n`);
+				}
+			} catch (err) {
+				console.error("SSE write error:", err);
+			}
+		};
 
-        if (!fs.existsSync(LOG_FILE)) {
-            fs.writeFileSync(LOG_FILE, "", "utf8");
-        }
+		if (!fs.existsSync(LOG_FILE)) {
+			fs.writeFileSync(LOG_FILE, "", "utf8");
+		}
 
-        // 1. Trim immediately if the log file is already over 128 KB when opening the page
-        trimLogFileIfNeeded();
+		// 1. Trim immediately if the log file is already over 128 KB when opening the page
+		trimLogFileIfNeeded();
 
-        let fileSize = fs.statSync(LOG_FILE).size;
+		let fileSize = fs.statSync(LOG_FILE).size;
 
-        // Helper to read only newly appended bytes during live chokidar updates
-        const readNewBytes = (filePath, start, end, onComplete) => {
-            if (end <= start || res.writableEnded) {
-                if (onComplete) onComplete();
-                return;
-            }
+		// Helper to read only newly appended bytes during live chokidar updates
+		const readNewBytes = (filePath, start, end, onComplete) => {
+			if (end <= start || res.writableEnded) {
+				if (onComplete) onComplete();
+				return;
+			}
 
-            const stream = fs.createReadStream(filePath, { start, end: end - 1 });
-            let leftover = "";
+			const stream = fs.createReadStream(filePath, { start, end: end - 1 });
+			let leftover = "";
 
-            stream.on("data", (chunk) => {
-                const lines = (leftover + chunk.toString()).split("\n");
-                leftover = lines.pop() || "";
-                lines.forEach(sendLog);
-            });
+			stream.on("data", (chunk) => {
+				const lines = (leftover + chunk.toString()).split("\n");
+				leftover = lines.pop() || "";
+				lines.forEach(sendLog);
+			});
 
-            stream.on("end", () => {
-                if (leftover && !res.writableEnded) sendLog(leftover);
-                if (onComplete) onComplete();
-            });
+			stream.on("end", () => {
+				if (leftover && !res.writableEnded) sendLog(leftover);
+				if (onComplete) onComplete();
+			});
 
-            stream.on("error", (err) => {
-                console.error("Log stream error:", err);
-                if (onComplete) onComplete();
-            });
-        };
+			stream.on("error", (err) => {
+				console.error("Log stream error:", err);
+				if (onComplete) onComplete();
+			});
+		};
 
-        // 2. Delayed Initial History Load (Gentle batching: 10 lines every 15ms)
-        const INITIAL_DELAY_MS = 0;
-        initialLoadTimer = setTimeout(() => {
-            try {
-                if (!res.writableEnded && fs.existsSync(LOG_FILE)) {
-                    const content = fs.readFileSync(LOG_FILE, "utf8");
-                    fileSize = Buffer.byteLength(content, "utf8");
+		// 2. Delayed Initial History Load (Gentle batching: 10 lines every 15ms)
+		const INITIAL_DELAY_MS = 0;
+		initialLoadTimer = setTimeout(() => {
+			try {
+				if (!res.writableEnded && fs.existsSync(LOG_FILE)) {
+					const content = fs.readFileSync(LOG_FILE, "utf8");
+					fileSize = Buffer.byteLength(content, "utf8");
 
-                    const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
-                    // Keep only the last 150 lines on initial load so it opens instantly
-                    const recentLines = lines.slice(-150);
+					const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+					// Keep only the last 150 lines on initial load so it opens instantly
+					const recentLines = lines.slice(-150);
 
-                    let index = 0;
-                    const batchSize = 10; // Push 10 lines at a time
+					let index = 0;
+					const batchSize = 10; // Push 10 lines at a time
 
-                    const sendBatch = () => {
-                        if (res.writableEnded || index >= recentLines.length) return;
+					const sendBatch = () => {
+						if (res.writableEnded || index >= recentLines.length) return;
 
-                        const batch = recentLines.slice(index, index + batchSize);
-                        batch.forEach(sendLog);
-                        index += batchSize;
+						const batch = recentLines.slice(index, index + batchSize);
+						batch.forEach(sendLog);
+						index += batchSize;
 
-                        setTimeout(sendBatch, 15); // 15ms pause between batches = perfectly smooth
-                    };
+						setTimeout(sendBatch, 15); // 15ms pause between batches = perfectly smooth
+					};
 
-                    sendBatch();
-                }
-            } catch (err) {
-                console.error("Error reading initial log history:", err);
-            }
-        }, INITIAL_DELAY_MS);
+					sendBatch();
+				}
+			} catch (err) {
+				console.error("Error reading initial log history:", err);
+			}
+		}, INITIAL_DELAY_MS);
 
-        // 3. Watch for live changes (Instant delivery + auto-trim if > 128 KB)
-        watcher = chokidar.watch(LOG_FILE, {
-            persistent: true,
-            usePolling: true,
-            interval: 150
-        });
+		// 3. Watch for live changes (Instant delivery + auto-trim if > 128 KB)
+		watcher = chokidar.watch(LOG_FILE, {
+			persistent: true,
+			usePolling: true,
+			interval: 150
+		});
 
-        watcher.on("change", (filePath) => {
-            try {
-                if (!fs.existsSync(filePath) || isRotatingLog) return;
-                const stats = fs.statSync(filePath);
+		watcher.on("change", (filePath) => {
+			try {
+				if (!fs.existsSync(filePath) || isRotatingLog) return;
+				const stats = fs.statSync(filePath);
 
-                if (stats.size > fileSize) {
-                    const previousSize = fileSize;
-                    fileSize = stats.size;
+				if (stats.size > fileSize) {
+					const previousSize = fileSize;
+					fileSize = stats.size;
 
-                    // Stream live updates instantly, then trim if file crossed 128 KB
-                    readNewBytes(filePath, previousSize, stats.size, () => {
-                        if (stats.size > MAX_LOG_SIZE && trimLogFileIfNeeded()) {
-                            fileSize = fs.statSync(filePath).size;
-                        }
-                    });
-                } else if (stats.size < fileSize) {
-                    // File was cleared or auto-rotated
-                    fileSize = stats.size;
-                    if (stats.size === 0) {
-                        sendLog("--- [SYSTEM] Logs cleared ---");
-                    }
-                }
-            } catch (err) {
-                console.error("Watcher change error:", err);
-            }
-        });
+					// Stream live updates instantly, then trim if file crossed 128 KB
+					readNewBytes(filePath, previousSize, stats.size, () => {
+						if (stats.size > MAX_LOG_SIZE && trimLogFileIfNeeded()) {
+							fileSize = fs.statSync(filePath).size;
+						}
+					});
+				} else if (stats.size < fileSize) {
+					// File was cleared or auto-rotated
+					fileSize = stats.size;
+					if (stats.size === 0) {
+						sendLog("--- [SYSTEM] Logs cleared ---");
+					}
+				}
+			} catch (err) {
+				console.error("Watcher change error:", err);
+			}
+		});
 
-        watcher.on("error", (err) => {
-            console.error("Chokidar error:", err);
-        });
+		watcher.on("error", (err) => {
+			console.error("Chokidar error:", err);
+		});
 
-        heartbeat = setInterval(() => {
-            try {
-                if (!res.writableEnded) {
-                    res.write(": heartbeat\n\n");
-                }
-            } catch (err) {
-                clearInterval(heartbeat);
-            }
-        }, 30000);
+		heartbeat = setInterval(() => {
+			try {
+				if (!res.writableEnded) {
+					res.write(": heartbeat\n\n");
+				}
+			} catch (err) {
+				clearInterval(heartbeat);
+			}
+		}, 30000);
 
-        req.on("close", () => {
-            if (initialLoadTimer) clearTimeout(initialLoadTimer);
-            if (heartbeat) clearInterval(heartbeat);
-            if (watcher) watcher.close().catch((err) => console.error("Failed to close watcher:", err));
-        });
-    } catch (err) {
-        console.error("Error setting up /stream-logs:", err);
-        if (initialLoadTimer) clearTimeout(initialLoadTimer);
-        if (heartbeat) clearInterval(heartbeat);
-        if (watcher) watcher.close().catch(() => {});
-        if (!res.headersSent) {
-            res.status(500).json({ error: "Failed to stream logs" });
-        }
-    }
+		req.on("close", () => {
+			if (initialLoadTimer) clearTimeout(initialLoadTimer);
+			if (heartbeat) clearInterval(heartbeat);
+			if (watcher) watcher.close().catch((err) => console.error("Failed to close watcher:", err));
+		});
+	} catch (err) {
+		console.error("Error setting up /stream-logs:", err);
+		if (initialLoadTimer) clearTimeout(initialLoadTimer);
+		if (heartbeat) clearInterval(heartbeat);
+		if (watcher) watcher.close().catch(() => { });
+		if (!res.headersSent) {
+			res.status(500).json({ error: "Failed to stream logs" });
+		}
+	}
 });
 
 app.get("/clearLog", async (req, res) => {
@@ -414,35 +479,42 @@ app.get("/clearLog", async (req, res) => {
 });
 
 async function deleteFileOrDirectory(filePath, isDirectory = false) {
-    if (!filePath) return;
+	if (!filePath) return;
 
-    try {
-        if (isDirectory) {
-            await fs.promises.rm(filePath, {
-                recursive: true,
-                force: true
-            });
-        } else {
-            await fs.promises.unlink(filePath);
-        }
-    } catch (err) {
-        if (err.code === 'ENOENT') return;
-        throw err;
-    }
+	try {
+		if (isDirectory) {
+			await fs.promises.rm(filePath, {
+				recursive: true,
+				force: true
+			});
+		} else {
+			await fs.promises.unlink(filePath);
+		}
+	} catch (err) {
+		if (err.code === 'ENOENT') return;
+		throw err;
+	}
 }
-			
+
 app.get("/removeRecent", async (req, res) => {
 	await db.read();
 	const recentData = db.data.sort((a, b) => b.id - a.id)[0]; // Keep all but the most recent entry
-	console.log("Most recent entry:", recentData);
+
 	if (recentData) {
-		console.log(recentData);
+
+		try {
+			spawn(`${__dirname}/src/tvseries_downloader.sh`, ["-k", String(recentData.id)]);
+		} catch (err) {
+			console.error("Error killing the download process:", err);
+		}
 		switch (recentData.category) {
 			case "movie":
 				try {
-					await deleteFileOrDirectory(recentData.output_path,false);
-					await deleteFileOrDirectory(recentData.source_path,false);
-					await deleteFileOrDirectory(path.join('/media/Movies', path.basename(recentData.output_path)),false);
+					await deleteFileOrDirectory(recentData.output_path, false);
+					await deleteFileOrDirectory(recentData.source_path, false);
+					if (recentData.output_path) {
+						await deleteFileOrDirectory(path.join('/media/Movies', path.basename(recentData.output_path)), false);
+					}
 					db.data = db.data.filter(entry => entry.id !== recentData.id);
 				} catch (err) { console.error("Error deleting movie file:", err); }
 
@@ -451,7 +523,9 @@ app.get("/removeRecent", async (req, res) => {
 				try {
 					await deleteFileOrDirectory(recentData.output_path, true);
 					await deleteFileOrDirectory(recentData.source_path, true);
-					await deleteFileOrDirectory(path.join('/media/Shows', path.basename(recentData.output_path)), true);
+					if (recentData.output_path) {
+						await deleteFileOrDirectory(path.join('/media/Shows', path.basename(recentData.output_path)), true);
+					}
 					db.data = db.data.filter(entry => entry.id !== recentData.id);
 				} catch (err) {
 					console.error("Error deleting show files:", err);
@@ -461,7 +535,9 @@ app.get("/removeRecent", async (req, res) => {
 				try {
 					await deleteFileOrDirectory(recentData.output_path, true);
 					await deleteFileOrDirectory(recentData.source_path, true);
-					await deleteFileOrDirectory(path.join('/media/Anime', path.basename(recentData.output_path)), true);
+					if (recentData.output_path) {
+						await deleteFileOrDirectory(path.join('/media/Animes', path.basename(recentData.output_path)), true);
+					}
 					db.data = db.data.filter(entry => entry.id !== recentData.id);
 				} catch (err) {
 					console.error("Error deleting anime files:", err);
@@ -475,15 +551,77 @@ app.get("/removeRecent", async (req, res) => {
 
 
 app.get("/getStorageInfo", async (req, res) => {
-    try {
-        const storageInfo = await getStorageInfo();
-        res.json(storageInfo);
-    } catch (error) {
-        console.error("Error fetching storage info:", error);
-        res.status(500).json({ error: "Failed to fetch storage info" });
-    }
+	try {
+		const storageInfo = await getStorageInfo();
+		res.json(storageInfo);
+	} catch (error) {
+		console.error("Error fetching storage info:", error);
+		res.status(500).json({ error: "Failed to fetch storage info" });
+	}
 });
 
+app.get('/listDir', async (req, res) => {
+	try {
+		const output = fs.createWriteStream(LOG_FILE, { flags: 'a' });
+		const root = path.resolve(process.env.OUTPUT || './output');
+
+		output.write(`\n========== ${path.basename(root)} ==========\n`);
+
+		function writeTree(dir, prefix = '') {
+			let entries;
+
+			try {
+				entries = fs.readdirSync(dir, { withFileTypes: true })
+					.sort((a, b) => {
+						if (a.isDirectory() !== b.isDirectory()) {
+							return a.isDirectory() ? -1 : 1;
+						}
+						return a.name.localeCompare(b.name);
+					});
+			} catch (err) {
+				output.write(`${prefix}└── [Error: ${err.message}]\n`);
+				return;
+			}
+
+			entries.forEach((entry, index) => {
+				const isLast = index === entries.length - 1;
+				const marker = isLast ? '└── ' : '├── ';
+				const isDir = entry.isDirectory();
+
+				output.write(`${prefix}${marker}${entry.name}${isDir ? '/' : ''}\n`);
+
+				if (isDir) {
+					writeTree(
+						path.join(dir, entry.name),
+						prefix + (isLast ? '    ' : '│   ')
+					);
+				}
+			});
+		}
+
+		try {
+			writeTree(root);
+		} catch (err) {
+			output.write(`Error: ${err.message}\n`);
+		}
+
+		output.write('====================\n');
+		output.end();
+
+		res.json({ success: 'done' });
+	} catch {
+
+		res.status(500).json({ error: "Failed to fetch storage info! Please try again.." });
+	}
+})
+
 app.listen(port, () => {
+
+	execFileSync("bash", ["-c", `
+    find ./src -type f -name "*.sh" -exec sed -i 's/\\r$//' {} +
+`], {
+		stdio: "inherit",
+		cwd: process.cwd()
+	});
 	console.log(`Server running at http://localhost:${port}`);
 });

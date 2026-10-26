@@ -25,13 +25,170 @@ const removeRecent = document.querySelector('.removerecent');
 const logSwitcher = document.querySelector('.log-switcher');
 const logContainer = document.querySelector('.options-log');
 const optionsContainer = document.querySelector('.options-menu');
+const listOutput = document.querySelector('.listoutput');
+const modeGdrive = document.querySelector('.mode-gdrive');
+const modeSiteDL = document.querySelector('.mode-siteDL');
+const modeMagnet = document.querySelector('.mode-magnet');
+const headingGdriveSvg = document.querySelector('h1 svg');
+const headingMagnetSvg = document.querySelector('h1 svg:nth-child(2)');
+const headingSiteDLSvg = document.querySelector('h1 svg:nth-child(3)');
+const infoButton = document.querySelector('.info');
+const infoContentContainer = document.querySelector('.infoContent-container');
+const infoContent = document.querySelector('.infoContent');
+const closeInfoContent = document.querySelector('.closeInfoContent');
+
+infoButton.addEventListener('click', () => {
+	infoContentContainer.classList.toggle('hidden');
+	mainContent.classList.toggle('blurred');
+	sidebar.classList.toggle('blurred');
+	optionsContainer.classList.toggle('blurred');
+});
+
+window.addEventListener('click', (event) => {
+	if ( (event.target === infoContentContainer || closeInfoContent.contains(event.target) ) &&  !infoButton.contains(event.target)) {
+		infoContentContainer.classList.add('hidden');
+		mainContent.classList.remove('blurred');
+		sidebar.classList.remove('blurred');
+		optionsContainer.classList.remove('blurred');
+	}
+});
+
+if (localStorage.getItem('mode')) {
+	setMode(localStorage.getItem('mode'));
+} else {
+	setMode('gdrive');
+}
+
+function setMode(mode) {
+	const title = document.querySelector('.title');
+	const urlInput = document.getElementById('urlInput');
+	const urlLabel = document.querySelector('label[for="urlInput"]');
+	const typeDescription = document.querySelector('.typeDescription');
+
+	const modeGdriveSvg1 = modeGdrive.querySelector('svg');
+	const modeGdriveSvg2 = modeGdrive.querySelector('svg:nth-child(2)');
+	const modeSiteDLSvg1 = modeSiteDL.querySelector('svg');
+	const modeSiteDLSvg2 = modeSiteDL.querySelector('svg:nth-child(2)');
+	const modeMagnetSvg1 = modeMagnet.querySelector('svg');
+	const modeMagnetSvg2 = modeMagnet.querySelector('svg:nth-child(2)');
+
+	if (mode === 'gdrive') {
+		title.textContent = 'GDrive Media Downloader';
+		urlLabel.textContent = 'Google Drive URL:';
+		urlInput.placeholder = 'Enter Google Drive URL';
+		typeDescription.textContent = '(Only ZIP and Media files are supported)';
+
+		headingGdriveSvg.classList.remove('hidden');
+		headingMagnetSvg.classList.add('hidden');
+		headingSiteDLSvg.classList.add('hidden');
+
+		modeGdrive.classList.add('selected');
+		modeSiteDL.classList.remove('selected');
+		modeMagnet.classList.remove('selected');
+		modeGdriveSvg1.classList.add('hidden');
+		modeGdriveSvg2.classList.remove('hidden');
+		modeSiteDLSvg1.classList.remove('hidden');
+		modeSiteDLSvg2.classList.add('hidden');
+		modeMagnetSvg1.classList.remove('hidden');
+		modeMagnetSvg2.classList.add('hidden');
+
+	} else if (mode === 'siteDL') {
+		title.textContent = 'Direct Media Downloader';
+		urlLabel.textContent = 'Direct URL:';
+		urlInput.placeholder = 'Enter direct Download URL';
+		typeDescription.textContent = '(Only ZIP and Media files are supported)';
+
+		headingGdriveSvg.classList.add('hidden');
+		headingMagnetSvg.classList.add('hidden');
+		headingSiteDLSvg.classList.remove('hidden');
+
+		modeGdrive.classList.remove('selected');
+		modeSiteDL.classList.add('selected');
+		modeMagnet.classList.remove('selected');
+		modeGdriveSvg1.classList.remove('hidden');
+		modeGdriveSvg2.classList.add('hidden');
+		modeSiteDLSvg1.classList.add('hidden');
+		modeSiteDLSvg2.classList.remove('hidden');
+		modeMagnetSvg1.classList.remove('hidden');
+		modeMagnetSvg2.classList.add('hidden');
+
+	} else if (mode === 'magnet') {
+		title.textContent = 'Torrent Media Downloader';
+		urlLabel.textContent = 'Magnet Link:';
+		urlInput.placeholder = 'Enter Magnet Link';
+		typeDescription.textContent = '(Only Media files are supported)';
+
+		headingGdriveSvg.classList.add('hidden');
+		headingMagnetSvg.classList.remove('hidden');
+		headingSiteDLSvg.classList.add('hidden');
+
+		modeGdrive.classList.remove('selected');
+		modeSiteDL.classList.remove('selected');
+		modeMagnet.classList.add('selected');
+		modeGdriveSvg1.classList.remove('hidden');
+		modeGdriveSvg2.classList.add('hidden');
+		modeSiteDLSvg1.classList.remove('hidden');
+		modeSiteDLSvg2.classList.add('hidden');
+		modeMagnetSvg1.classList.add('hidden');
+		modeMagnetSvg2.classList.remove('hidden');
+	}
+
+}
+
+
+modeGdrive.addEventListener('click', () => {
+	setMode('gdrive');
+	localStorage.setItem('mode', 'gdrive');
+	sidebarHeaderMenu.click();
+});
+
+
+modeSiteDL.addEventListener('click', () => {
+	setMode('siteDL');
+	localStorage.setItem('mode', 'siteDL');
+	sidebarHeaderMenu.click();
+});
+
+modeMagnet.addEventListener('click', () => {
+	setMode('magnet');
+	localStorage.setItem('mode', 'magnet');
+	sidebarHeaderMenu.click();
+});
+
+listOutput.addEventListener('click', async function () {
+
+	fetch('/listDir', {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	}).then(response => response.json())
+		.then(data => {
+			if (data.error) {
+				statusElement.innerHTML = data.error;
+				sidebarHeaderMenu.click();
+			} else {
+				if (window.innerWidth < 768) {
+					logContainer.classList.toggle('show');
+					optionsContainer.classList.toggle('hide');
+				}
+
+			}
+
+		}).catch(error => {
+			statusElement.innerHTML = 'An error occurred. Please try again.';
+			sidebarHeaderMenu.click();
+		})
+
+
+})
 
 logSwitcher.addEventListener('click', function () {
-	
+
 	logContainer.classList.toggle('show');
 
 	optionsContainer.classList.toggle('hide');
-	
+
 });
 
 
@@ -53,17 +210,17 @@ removeRecent.addEventListener('click', function () {
 		}).catch(error => {
 			statusElement.innerHTML = 'An error occurred. Please try again.';
 			fetchItems();
-		})		
+		})
 });
 moreOptions.addEventListener('click', () => {
 
-moreOptionsIcon.classList.toggle('hidden');
-moreOptionsIconLeft.classList.toggle('hidden');
+	moreOptionsIcon.classList.toggle('hidden');
+	moreOptionsIconLeft.classList.toggle('hidden');
 
-seriesLabel.classList.toggle('hidden');
-moviesLabel.classList.toggle('hidden');
+	seriesLabel.classList.toggle('hidden');
+	moviesLabel.classList.toggle('hidden');
 
-animeLabel.classList.toggle('hidden');
+	animeLabel.classList.toggle('hidden');
 });
 
 
@@ -72,51 +229,50 @@ let isFirstScroll = true;
 
 
 sidebar.addEventListener('scroll', () => {
-    console.log(sidebar.scrollTop);
 
-    if (sidebar.scrollTop > 0 && !sidebar.classList.contains('expanded')) {
-        sidebar.classList.add('expanded');
-	
-        isFirstScroll = true;
-    } else if (sidebar.scrollTop === 0 && sidebar.classList.contains('expanded') && !isFirstScroll) {
-        sidebar.classList.remove('expanded');
-        isFirstScroll = false;
-    }
+	if (sidebar.scrollTop > 0 && !sidebar.classList.contains('expanded')) {
+		sidebar.classList.add('expanded');
+
+		isFirstScroll = true;
+	} else if (sidebar.scrollTop === 0 && sidebar.classList.contains('expanded') && !isFirstScroll) {
+		sidebar.classList.remove('expanded');
+		isFirstScroll = false;
+	}
 
 });
 
 let touchStartY = 0;
 
 sidebar.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
+	touchStartY = e.touches[0].clientY;
 }, { passive: true });
 
 sidebar.addEventListener('touchmove', (e) => {
-    const currentY = e.touches[0].clientY;
-    const deltaY = currentY - touchStartY;
+	const currentY = e.touches[0].clientY;
+	const deltaY = currentY - touchStartY;
 
-    if (
-        sidebar.classList.contains('expanded') &&
-        sidebar.scrollTop === 0 &&
-        deltaY > 1
-    ) {
-        e.preventDefault();
-    }
+	if (
+		sidebar.classList.contains('expanded') &&
+		sidebar.scrollTop === 0 &&
+		deltaY > 1
+	) {
+		e.preventDefault();
+	}
 }, { passive: false });
 
 
 
 sidebar.addEventListener('touchend', (e) => {
-    const deltaY = e.changedTouches[0].clientY - touchStartY;
+	const deltaY = e.changedTouches[0].clientY - touchStartY;
 
-    if (
-        sidebar.classList.contains('expanded') &&
-        sidebar.scrollTop === 0 &&
-        deltaY > 50
-    ) {
-        sidebar.classList.remove('expanded');
-        isFirstScroll = false;
-    }
+	if (
+		sidebar.classList.contains('expanded') &&
+		sidebar.scrollTop === 0 &&
+		deltaY > 50
+	) {
+		sidebar.classList.remove('expanded');
+		isFirstScroll = false;
+	}
 }, { passive: true });
 
 let clearState = false;
@@ -187,46 +343,46 @@ function fetchStorageInfo() {
 		.then(data => {
 			storageInfoContainer.innerHTML = ''; // Clear the existing storage info before fetching new data
 			data.forEach(disk => {
-			
-				console.log('Disk Info:', disk); // Log the disk info to the console for debugging
-			const storage = document.createElement('div');
-			storage.classList.add('storage');
 
-			const storageName = document.createElement('span');
-			storageName.classList.add('storage-name');
 
-			storageName.textContent = disk.mount.split('/').pop()===""?"Root":disk.mount.split('/').pop();
-			
+				const storage = document.createElement('div');
+				storage.classList.add('storage');
+
+				const storageName = document.createElement('span');
+				storageName.classList.add('storage-name');
+
+				storageName.textContent = disk.mount.split('/').pop() === "" ? "Root" : disk.mount.split('/').pop();
+
 				storage.appendChild(storageName);
 
-			const storagePath = document.createElement('span');
-			storagePath.classList.add('storage-path');
-			storagePath.textContent = disk.mount;
+				const storagePath = document.createElement('span');
+				storagePath.classList.add('storage-path');
+				storagePath.textContent = disk.mount;
 
-			storage.appendChild(storagePath);
+				storage.appendChild(storagePath);
 
-			const storageProgress = document.createElement('div');
-			storageProgress.classList.add('storage-progress');
-			const progressBar = document.createElement('progress');
-			progressBar.max = 100;
-			progressBar.value = disk.usagePercent;
-			storageProgress.appendChild(progressBar);
+				const storageProgress = document.createElement('div');
+				storageProgress.classList.add('storage-progress');
+				const progressBar = document.createElement('progress');
+				progressBar.max = 100;
+				progressBar.value = disk.usagePercent;
+				storageProgress.appendChild(progressBar);
 
-			storage.appendChild(storageProgress);
+				storage.appendChild(storageProgress);
 
-			const storageSubinfo = document.createElement('div');
-			storageSubinfo.classList.add('storage-subinfo');
-			const storageUsagePercentage = document.createElement('span');
-			storageUsagePercentage.classList.add('storage-usage-percentage');
-			const storageUsage = document.createElement('span');
-			storageUsage.classList.add('storage-usage');
-			storageUsagePercentage.textContent = `${disk.usagePercent.toFixed(2)}%`;
-			storageUsage.textContent = `${disk.usedGB.toFixed(2)} GB / ${disk.totalGB.toFixed(2)} GB`;
-			storageSubinfo.appendChild(storageUsagePercentage);
-			storageSubinfo.appendChild(storageUsage);
-			storage.appendChild(storageSubinfo);
+				const storageSubinfo = document.createElement('div');
+				storageSubinfo.classList.add('storage-subinfo');
+				const storageUsagePercentage = document.createElement('span');
+				storageUsagePercentage.classList.add('storage-usage-percentage');
+				const storageUsage = document.createElement('span');
+				storageUsage.classList.add('storage-usage');
+				storageUsagePercentage.textContent = `${disk.usagePercent.toFixed(2)}%`;
+				storageUsage.textContent = `${disk.usedGB.toFixed(2)} GB / ${disk.totalGB.toFixed(2)} GB`;
+				storageSubinfo.appendChild(storageUsagePercentage);
+				storageSubinfo.appendChild(storageUsage);
+				storage.appendChild(storageSubinfo);
 
-			storageInfoContainer.appendChild(storage);
+				storageInfoContainer.appendChild(storage);
 			});
 		}).catch(error => {
 			console.error('Error fetching storage info:', error);
@@ -307,7 +463,7 @@ deleteOne.addEventListener('click', async function () {
 		clearState = false;
 		return;
 	}
-	
+
 	fetch('/deleteOne', {
 		method: 'POST',
 		headers: {
@@ -435,6 +591,12 @@ resetButton.addEventListener('click', function () {
 const googleDriveFileRegex =
 	/^https?:\/\/drive\.google\.com\/file\/d\/[^/?#]+(?:\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i;
 
+const magnetLinkRegex =
+	/^magnet:\?(?=[^#\s]*\bxt=urn:btih:[a-z0-9]{32,40}(?:&|#|$))[^#\s]+(?:#.*)?$/i;
+
+const mediaFileRegex =
+	/^https?:\/\/[^\s?#]+\.(?:mkv|mp4|zip)(?:\?[^#]*)?(?:#.*)?$/i;
+
 let overrideConfirmation = false;
 
 urlInput.addEventListener('input', function () {
@@ -453,17 +615,30 @@ nameInput.addEventListener('input', function () {
 downloadButton.addEventListener('click', function () {
 	const url = urlInput.value;
 	const name = nameInput.value;
+	const mode = localStorage.getItem('mode');
+
 	if (!url || !name) {
 
 		if (!url && !name) {
 			urlInput.className = 'urlInput-error';
 			nameInput.className = 'nameInput-error';
-			statusElement.innerHTML = 'Please enter both a valid Google Drive URL and a file name';
-
+			if (mode === 'gdrive') {
+				statusElement.innerHTML = 'Please enter both a valid Google Drive URL and a file name';
+			} else if (mode === 'siteDL') {
+				statusElement.innerHTML = 'Please enter both a valid direct download URL and a file name';
+			} else {
+				statusElement.innerHTML = 'Please enter both a valid Magnet Link and a file name';
+			}
 		} else if (!url) {
 			urlInput.className = 'urlInput-error';
 			nameInput.className = 'nameInput-success';
-			statusElement.innerHTML = 'Please enter a valid Google Drive URL';
+			if (mode === 'gdrive') {
+				statusElement.innerHTML = 'Please enter a valid Google Drive URL';
+			} else if (mode === 'siteDL') {
+				statusElement.innerHTML = 'Please enter a valid direct download URL (ZIP or Media file)';
+			} else {
+				statusElement.innerHTML = 'Please enter a valid Magnet Link';
+			}
 		} else if (!name) {
 			nameInput.className = 'nameInput-error';
 			urlInput.className = 'urlInput-success';
@@ -472,12 +647,32 @@ downloadButton.addEventListener('click', function () {
 
 		return;
 
-	} else if (!googleDriveFileRegex.test(url)) {
-		statusElement.innerHTML = 'Please enter a valid Google Drive URL';
-		urlInput.className = 'urlInput-error';
-		nameInput.className = 'nameInput-error';
-		return;
 	}
+
+	if (mode === 'gdrive') {
+		if ((!googleDriveFileRegex.test(url))) {
+			statusElement.innerHTML = 'Please enter a valid Google Drive URL';
+			urlInput.className = 'urlInput-error';
+			nameInput.className = 'nameInput-error';
+			return;
+		}
+	} else if (mode === 'siteDL') {
+		if ((!mediaFileRegex.test(url))) {
+			statusElement.innerHTML = 'Please enter a valid direct download URL (ZIP or Media file)';
+			urlInput.className = 'urlInput-error';
+			nameInput.className = 'nameInput-error';
+			return;
+		}
+	} else {
+		if ((!magnetLinkRegex.test(url))) {
+			statusElement.innerHTML = 'Please enter a valid Magnet Link';
+			urlInput.className = 'urlInput-error';
+			nameInput.className = 'nameInput-error';
+			return;
+		}
+	}
+
+
 	urlInput.className = 'urlInput-success';
 	nameInput.className = 'nameInput-success';
 	downloadButton.classList.add('disabled');
@@ -485,7 +680,7 @@ downloadButton.addEventListener('click', function () {
 
 	let category = document.querySelector('input[name="category"]:checked').value;
 
-	fetch('/download', {
+	fetch(`/download/${mode}`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
