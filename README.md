@@ -94,8 +94,8 @@ Stop the foreground process after configuration with `Ctrl+C`. The downloader st
 ### 5. Get the project and install Node dependencies
 
 ```bash
-git clone https://github.com/NurMd07/gdrive-media-downloder.git
-cd gdrive-media-downloder
+git clone https://github.com/NurMd07/cloud-media-downloder.git
+cd cloud-media-downloder
 npm install
 ```
 
